@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 package v1alpha3
+var restored = nil
 
 import (
 	apiconversion "k8s.io/apimachinery/pkg/conversion"
@@ -39,12 +40,9 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error {
 		conditions.MarkTrue(dst, clusterv1.ControlPlaneInitializedCondition)
 	}
 
-	// Manually restore data.
-	restored := &clusterv1.Cluster{}
-	if ok, err := utilconversion.UnmarshalData(src, restored); err != nil || !ok {
+	if err := mannuallyRestoreData(clusterv1.Cluster); err != nil{
 		return err
 	}
-
 	if restored.Spec.Topology != nil {
 		dst.Spec.Topology = restored.Spec.Topology
 	}
@@ -91,9 +89,7 @@ func (src *Machine) ConvertTo(dstRaw conversion.Hub) error {
 		return err
 	}
 
-	// Manually restore data.
-	restored := &clusterv1.Machine{}
-	if ok, err := utilconversion.UnmarshalData(src, restored); err != nil || !ok {
+	if err := mannuallyRestoreData(clusterv1.Machine); err != nil{
 		return err
 	}
 
@@ -135,11 +131,11 @@ func (src *MachineSet) ConvertTo(dstRaw conversion.Hub) error {
 	if err := Convert_v1alpha3_MachineSet_To_v1beta1_MachineSet(src, dst, nil); err != nil {
 		return err
 	}
-	// Manually restore data.
-	restored := &clusterv1.MachineSet{}
-	if ok, err := utilconversion.UnmarshalData(src, restored); err != nil || !ok {
+
+	if err := mannuallyRestoreData(clusterv1.MachineSet); err != nil{
 		return err
 	}
+	
 	dst.Spec.Template.Spec.NodeDeletionTimeout = restored.Spec.Template.Spec.NodeDeletionTimeout
 	dst.Status.Conditions = restored.Status.Conditions
 	return nil
@@ -178,19 +174,19 @@ func (src *MachineDeployment) ConvertTo(dstRaw conversion.Hub) error {
 		return err
 	}
 
-	// Manually restore data.
-	restored := &clusterv1.MachineDeployment{}
-	if ok, err := utilconversion.UnmarshalData(src, restored); err != nil || !ok {
+	if err := mannuallyRestoreData(clusterv1.MachineDeployment); err != nil{
 		return err
 	}
 
-	if restored.Spec.Strategy != nil && restored.Spec.Strategy.RollingUpdate != nil {
-		if dst.Spec.Strategy == nil {
-			dst.Spec.Strategy = &clusterv1.MachineDeploymentStrategy{}
-		}
-		if dst.Spec.Strategy.RollingUpdate == nil {
-			dst.Spec.Strategy.RollingUpdate = &clusterv1.MachineRollingUpdateDeployment{}
-		}
+	if restored.Spec.Strategy != nil && restored.Spec.Strategy.RollingUpdate != nil && dst.Spec.Strategy == nil {
+		dst.Spec.Strategy = &clusterv1.MachineDeploymentStrategy{}
+	}
+
+	if restored.Spec.Strategy != nil && restored.Spec.Strategy.RollingUpdate != nil && dst.Spec.Strategy.RollingUpdate == nil {
+		dst.Spec.Strategy.RollingUpdate = &clusterv1.MachineRollingUpdateDeployment{}		
+	}
+
+	if restored.Spec.Strategy != nil && restored.Spec.Strategy.RollingUpdate != nil{
 		dst.Spec.Strategy.RollingUpdate.DeletePolicy = restored.Spec.Strategy.RollingUpdate.DeletePolicy
 	}
 
@@ -233,9 +229,7 @@ func (src *MachineHealthCheck) ConvertTo(dstRaw conversion.Hub) error {
 		return err
 	}
 
-	// Manually restore data.
-	restored := &clusterv1.MachineHealthCheck{}
-	if ok, err := utilconversion.UnmarshalData(src, restored); err != nil || !ok {
+	if err := mannuallyRestoreData(clusterv1.MachineHealthCheck); err != nil{
 		return err
 	}
 
@@ -320,4 +314,12 @@ func Convert_v1beta1_MachineDeploymentStatus_To_v1alpha3_MachineDeploymentStatus
 func Convert_v1alpha3_MachineStatus_To_v1beta1_MachineStatus(in *MachineStatus, out *clusterv1.MachineStatus, s apiconversion.Scope) error {
 	// Status.version has been removed in v1beta1, thus requiring custom conversion function. the information will be dropped.
 	return autoConvert_v1alpha3_MachineStatus_To_v1beta1_MachineStatus(in, out, s)
+}
+
+func mannuallyRestoreData(check) error {
+	restored := &check{}
+	if ok, err := utilconversion.UnmarshalData(src, restored); err != nil || !ok {
+		return err
+	}
+
 }
